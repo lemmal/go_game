@@ -3,20 +3,16 @@ package main
 import (
 	"fmt"
 	"go_game/src/gnet"
-	"sync"
 )
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(2)
 	fmt.Println("hello world")
-	go func() {
-		gnet.Bind()
-		wg.Done()
-	}()
-	go func() {
-		gnet.LoopConn()
-		wg.Done()
-	}()
-	wg.Wait()
+	server := gnet.CreateServer("tcp", "127.0.0.1", 2046)
+	server.Start()
+	select {
+	case needShutdown := <-server.GetShutdownChan():
+		if needShutdown {
+			server.Shutdown()
+		}
+	}
 }
