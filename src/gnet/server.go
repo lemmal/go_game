@@ -2,6 +2,8 @@ package gnet
 
 import (
 	"fmt"
+	"go_game/src/gevent"
+	"go_game/src/gnet/iface"
 	"io"
 	"log"
 	"net"
@@ -11,20 +13,22 @@ import (
 )
 
 type Server struct {
-	connMap    sync.Map  //管理客户端连接
-	network    string    //网络层协议
-	host       string    //服务端host
-	port       int       //服务端端口
-	shutdownCh chan bool //关闭信号通道
+	connMap    sync.Map         //管理客户端连接
+	network    string           //网络层协议
+	host       string           //服务端host
+	port       int              //服务端端口
+	shutdownCh chan bool        //关闭信号通道
+	eventLoop  gevent.EventLoop //worker协程池
 }
 
-func CreateServer(network string, host string, port int) IServer {
+func CreateServer(network string, host string, port int) iface.IServer {
 	return &Server{
 		connMap:    sync.Map{},
 		network:    network,
 		host:       host,
 		port:       port,
 		shutdownCh: make(chan bool),
+		eventLoop:  gevent.CreateLoop(100),
 	}
 }
 
@@ -33,13 +37,14 @@ func (server *Server) Start() {
 	builder.WriteString(server.host)
 	builder.WriteString(" : ")
 	builder.WriteString(strconv.FormatInt(int64(server.port), 10))
-	listen, err := net.Listen(server.network, builder.String())
+	listener, err := net.Listen(server.network, builder.String())
 	if nil != err {
 		log.Fatal(err)
 	}
 	log.Printf("=====  server start! network:{%s}, host:{%s}, port:{%d}  =====\n", server.network, server.host, server.port)
-	go server.accept(listen)
+	go server.accept(listener)
 	go server.loopConn()
+	go server.eventLoop.Start()
 }
 
 func (server *Server) GetShutdownChan() chan bool {
@@ -85,6 +90,8 @@ func (server *Server) selectConn() {
 			return true
 		}
 		//TODO
+		event := gevent.CreateEvent(1, "send", make(map[string]interface{}))
+		server.eventLoop.Push(event)
 		protocol := BuildProtocolFromBytes(buf[0:length])
 		fmt.Println(protocol)
 		return true
