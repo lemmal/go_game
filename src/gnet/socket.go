@@ -8,8 +8,7 @@ import (
 	"sync"
 )
 
-var conns = make(map[string]net.Conn)
-var mutex sync.Mutex
+var connMap sync.Map
 
 func Bind() {
 	listen, err := net.Listen("tcp", "127.0.0.1 : 2046")
@@ -28,9 +27,7 @@ func accept(listen net.Listener) {
 			}
 			continue
 		}
-		mutex.Lock()
-		conns[conn.RemoteAddr().String()] = conn
-		mutex.Unlock()
+		connMap.Store(conn.RemoteAddr().String(), conn)
 	}
 }
 
@@ -41,20 +38,19 @@ func LoopConn() {
 }
 
 func selectConn() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	for _, conn := range conns {
+	connMap.Range(func(key, conn interface{}) bool {
 		var buf = make([]byte, 1024)
-		length, err := conn.Read(buf)
+		length, err := conn.(net.Conn).Read(buf)
 		if nil != err {
 			if err != io.EOF {
 				log.Println(err)
 			}
-			delete(conns, conn.RemoteAddr().String())
-			continue
+			connMap.Delete(conn.(net.Conn).RemoteAddr().String())
+			return true
 		}
 		//TODO
 		protocol := BuildProtocolFromBytes(buf[0:length])
 		fmt.Println(protocol)
-	}
+		return true
+	})
 }
