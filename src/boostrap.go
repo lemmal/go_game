@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"go_game/src/net"
+	"go_game/src/gnet"
 	"sync"
 )
 
@@ -11,11 +11,11 @@ func main() {
 	wg.Add(2)
 	fmt.Println("hello world")
 	go func() {
-		net.Bind()
+		gnet.Bind()
 		wg.Done()
 	}()
 	go func() {
-		net.LoopConn()
+		gnet.LoopConn()
 		wg.Done()
 	}()
 	wg.Wait()
