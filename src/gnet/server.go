@@ -1,7 +1,6 @@
 package gnet
 
 import (
-	"fmt"
 	"go_game/src/gevent"
 	"go_game/src/gnet/iface"
 	"io"
@@ -16,12 +15,12 @@ type Server struct {
 	connMap    sync.Map           //管理客户端连接
 	network    string             //网络层协议
 	host       string             //服务端host
-	port       int                //服务端端口
+	port       int32              //服务端端口
 	shutdownCh chan bool          //关闭信号通道
 	eventLoops []gevent.EventLoop //worker协程池
 }
 
-func CreateServer(network string, host string, port int) iface.IServer {
+func CreateServer(network string, host string, port int32) iface.IServer {
 	server := &Server{
 		connMap:    sync.Map{},
 		network:    network,
@@ -96,11 +95,11 @@ func (server *Server) selectConn() {
 			server.connMap.Delete(conn.(net.Conn).RemoteAddr().String())
 			return true
 		}
-		//TODO
-		event := gevent.CreateEvent(0, 1, "send", make(map[string]interface{}))
-		server.eventLoops[event.GetUserId()%len(server.eventLoops)].Push(event)
 		protocol := BuildProtocolFromBytes(buf[0:length])
-		fmt.Println(protocol)
+		//TODO 验证protocol
+		event := gevent.CreateEventFromBytes(protocol.msg)
+		index := event.GetUserId() % int32(len(server.eventLoops))
+		server.eventLoops[index].Push(event)
 		return true
 	})
 }

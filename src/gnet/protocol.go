@@ -1,9 +1,7 @@
 package gnet
 
 import (
-	"bytes"
-	"encoding/binary"
-	"log"
+	"go_game/src/util"
 )
 
 type Protocol struct {
@@ -21,33 +19,16 @@ func CreateProtocol(len, msgId int32, msg []byte) Protocol {
 }
 
 func BuildProtocolFromBytes(buf []byte) Protocol {
-	length := bytes2Int(buf[0:4])
+	length := util.Bytes2Int(buf[0:4])
 	return Protocol{
 		len:   length,
-		msgId: bytes2Int(buf[4:8]),
-		msg:   buf[8:length],
+		msgId: util.Bytes2Int(buf[4:8]),
+		msg:   buf[8 : length+4],
 	}
-}
-
-func bytes2Int(buf []byte) int32 {
-	var result int32
-	nb := bytes.NewBuffer(buf)
-	if err := binary.Read(nb, binary.BigEndian, &result); nil != err {
-		log.Println(err)
-	}
-	return result
-}
-
-func int2Bytes(i int32) []byte {
-	bytesBuffer := bytes.NewBuffer([]byte{})
-	if err := binary.Write(bytesBuffer, binary.BigEndian, i); nil != err {
-		log.Println(err)
-	}
-	return bytesBuffer.Bytes()
 }
 
 func (p *Protocol) ToBytes() (buf []byte) {
 	buf = make([]byte, 0)
-	buf = append(append(append(buf, int2Bytes(p.len)...), int2Bytes(p.msgId)...), p.msg...)
+	buf = append(append(append(buf, util.Int2Bytes(p.len)...), util.Int2Bytes(p.msgId)...), p.msg...)
 	return buf
 }

@@ -1,7 +1,9 @@
 package gnet
 
 import (
+	"encoding/json"
 	"fmt"
+	"go_game/src/gevent"
 	"log"
 	"net"
 	"testing"
@@ -10,11 +12,21 @@ import (
 var conn net.Conn
 
 func TestConnect(t *testing.T) {
-	msg := []byte("tell me something")
+	event := initEvent()
+	msg, err := json.Marshal(event)
+	if nil != err {
+		log.Fatal(err)
+	}
 	protocol := CreateProtocol(int32(4+len(msg)), 1, msg)
 	connect("tcp", "127.0.0.1 : 2046")
 	call(protocol)
 	close()
+}
+
+func initEvent() gevent.Event {
+	param := make(map[string]interface{})
+	param["score"] = 10
+	return gevent.CreateEvent(1, 2, 1, param)
 }
 
 func connect(network string, address string) {

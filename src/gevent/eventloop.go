@@ -8,7 +8,7 @@ type EventLoop struct {
 	events chan Event //事件队列
 }
 
-func CreateLoop(maxLen int) EventLoop {
+func CreateLoop(maxLen int32) EventLoop {
 	return EventLoop{
 		events: make(chan Event, maxLen),
 	}
