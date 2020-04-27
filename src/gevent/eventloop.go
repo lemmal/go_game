@@ -16,7 +16,6 @@ func CreateLoop(maxLen int32) EventLoop {
 
 func (loop *EventLoop) Push(event Event) {
 	loop.events <- event
-	fmt.Println(len(loop.events))
 }
 
 func (loop *EventLoop) Start() {

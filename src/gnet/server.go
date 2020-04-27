@@ -8,11 +8,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type Server struct {
-	connMap    sync.Map           //管理客户端连接
+	cm         ConnectionManager  //管理客户端连接
 	network    string             //网络层协议
 	host       string             //服务端host
 	port       int32              //服务端端口
@@ -22,14 +21,14 @@ type Server struct {
 
 func CreateServer(network string, host string, port int32) iface.IServer {
 	server := &Server{
-		connMap:    sync.Map{},
+		cm:         CreateManager(),
 		network:    network,
 		host:       host,
 		port:       port,
 		shutdownCh: make(chan bool),
 		eventLoops: make([]gevent.EventLoop, 8),
 	}
-	for index, _ := range server.eventLoops {
+	for index := range server.eventLoops {
 		server.eventLoops[index] = gevent.CreateLoop(100)
 	}
 	return server
@@ -58,10 +57,7 @@ func (server *Server) GetShutdownChan() chan bool {
 }
 
 func (server *Server) Shutdown() {
-	server.connMap.Range(func(key, value interface{}) bool {
-		server.connMap.Delete(key)
-		return true
-	})
+	server.cm.Shutdown()
 	log.Printf("=====  server destroy! host:{%s}, port:{%d}  =====\n", server.host, server.port)
 }
 
@@ -74,7 +70,7 @@ func (server *Server) accept(listen net.Listener) {
 			}
 			continue
 		}
-		server.connMap.Store(conn.RemoteAddr().String(), conn)
+		server.cm.Store(conn.RemoteAddr().String(), conn)
 	}
 }
 
@@ -85,18 +81,20 @@ func (server *Server) loopConn() {
 }
 
 func (server *Server) selectConn() {
-	server.connMap.Range(func(key, conn interface{}) bool {
+	server.cm.ApplyInRange(func(key, conn interface{}) bool {
 		var buf = make([]byte, 1024)
 		length, err := conn.(net.Conn).Read(buf)
 		if nil != err {
 			if err != io.EOF {
 				log.Println(err)
 			}
-			server.connMap.Delete(conn.(net.Conn).RemoteAddr().String())
+			server.cm.Delete(conn.(net.Conn).RemoteAddr().String())
 			return true
 		}
+		//TODO 字节流解包切分问题
 		protocol := BuildProtocolFromBytes(buf[0:length])
 		//TODO 验证protocol
+		//TODO User->Connection管理
 		event := gevent.CreateEventFromBytes(protocol.msg)
 		index := event.GetUserId() % int32(len(server.eventLoops))
 		server.eventLoops[index].Push(event)
