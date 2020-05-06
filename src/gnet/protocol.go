@@ -28,6 +28,8 @@ func BuildProtocolFromBytes(length int32, buf []byte) Protocol {
 
 func (p *Protocol) ToBytes() (buf []byte) {
 	buf = make([]byte, 0)
-	buf = append(append(append(buf, util.Int2Bytes(p.len)...), util.Int2Bytes(p.msgId)...), p.msg...)
+	buf = append(buf, util.Int2Bytes(p.len)...)
+	buf = append(buf, util.Int2Bytes(p.msgId)...)
+	buf = append(buf, p.msg...)
 	return buf
 }
