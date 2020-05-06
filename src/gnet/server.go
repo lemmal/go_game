@@ -3,6 +3,7 @@ package gnet
 import (
 	"go_game/src/gevent"
 	"go_game/src/gnet/iface"
+	"go_game/src/util"
 	"io"
 	"log"
 	"net"
@@ -45,7 +46,6 @@ func (server *Server) Start() {
 	}
 	log.Printf("=====  server start! network:{%s}, host:{%s}, port:{%d}  =====\n", server.network, server.host, server.port)
 	go server.accept(listener)
-	go server.loopConn()
 	for _, loop := range server.eventLoops {
 		l := loop
 		go l.Start()
@@ -71,33 +71,34 @@ func (server *Server) accept(listen net.Listener) {
 			continue
 		}
 		server.cm.Store(conn.RemoteAddr().String(), conn)
+		go server.selectConn(conn)
 	}
 }
 
-func (server *Server) loopConn() {
+func (server *Server) selectConn(conn net.Conn) {
 	for {
-		server.selectConn()
-	}
-}
-
-func (server *Server) selectConn() {
-	server.cm.ApplyInRange(func(key, conn interface{}) bool {
-		var buf = make([]byte, 1024)
-		length, err := conn.(net.Conn).Read(buf)
-		if nil != err {
+		var head = make([]byte, 4)
+		if _, err := io.ReadFull(conn, head); nil != err {
 			if err != io.EOF {
 				log.Println(err)
 			}
-			server.cm.Delete(conn.(net.Conn).RemoteAddr().String())
-			return true
+			server.cm.Delete(conn.RemoteAddr().String())
+			return
 		}
-		//TODO 字节流解包切分问题
-		protocol := BuildProtocolFromBytes(buf[0:length])
+		length := util.Bytes2Int(head)
+		buf := make([]byte, length)
+		if _, err := io.ReadFull(conn, buf); nil != err {
+			if err != io.EOF {
+				log.Println(err)
+			}
+			server.cm.Delete(conn.RemoteAddr().String())
+			return
+		}
+		protocol := BuildProtocolFromBytes(length, buf)
 		//TODO 验证protocol
 		//TODO User->Connection管理
 		event := gevent.CreateEventFromBytes(protocol.msg)
 		index := event.GetUserId() % int32(len(server.eventLoops))
 		server.eventLoops[index].Push(event)
-		return true
-	})
+	}
 }

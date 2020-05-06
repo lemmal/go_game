@@ -18,12 +18,11 @@ func CreateProtocol(len, msgId int32, msg []byte) Protocol {
 	}
 }
 
-func BuildProtocolFromBytes(buf []byte) Protocol {
-	length := util.Bytes2Int(buf[0:4])
+func BuildProtocolFromBytes(length int32, buf []byte) Protocol {
 	return Protocol{
 		len:   length,
-		msgId: util.Bytes2Int(buf[4:8]),
-		msg:   buf[8 : length+4],
+		msgId: util.Bytes2Int(buf[0:4]),
+		msg:   buf[4:],
 	}
 }
 

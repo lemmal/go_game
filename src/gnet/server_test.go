@@ -20,6 +20,7 @@ func TestConnect(t *testing.T) {
 	protocol := CreateProtocol(int32(4+len(msg)), 1, msg)
 	connect("tcp", "127.0.0.1 : 2046")
 	call(protocol)
+	call(protocol)
 	close()
 }
 
