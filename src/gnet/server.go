@@ -38,7 +38,7 @@ func CreateServer(network string, host string, port int32) iface.IServer {
 func (server *Server) Start() {
 	var builder strings.Builder
 	builder.WriteString(server.host)
-	builder.WriteString(" : ")
+	builder.WriteString(":")
 	builder.WriteString(strconv.FormatInt(int64(server.port), 10))
 	listener, err := net.Listen(server.network, builder.String())
 	if nil != err {
