@@ -10,6 +10,7 @@ import (
 )
 
 var conn net.Conn
+var msgId int32 = 0
 
 func TestConnect(t *testing.T) {
 	event := initEvent()
@@ -17,17 +18,17 @@ func TestConnect(t *testing.T) {
 	if nil != err {
 		log.Fatal(err)
 	}
-	protocol := CreateProtocol(int32(4+len(msg)), 1, msg)
+	login := CreateProtocol(int32(4+len(msg)), msgId, msg)
 	connect("tcp", "127.0.0.1:12001")
-	call(protocol)
-	call(protocol)
+	call(login)
+	//call(login)
 	close()
 }
 
 func initEvent() gevent.Event {
 	param := make(map[string]interface{})
 	param["score"] = 10
-	return gevent.CreateEvent(1, 2, 1, param)
+	return gevent.CreateEvent(1, 1, 1, param)
 }
 
 func connect(network string, address string) {

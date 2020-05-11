@@ -1,4 +1,4 @@
-package gnet
+package guser
 
 import (
 	"log"
@@ -10,10 +10,16 @@ type ConnectionManager struct {
 	connMap sync.Map
 }
 
-func CreateManager() ConnectionManager {
-	return ConnectionManager{
-		connMap: sync.Map{},
-	}
+var cm ConnectionManager
+var cmInit sync.Once
+
+func GetConnectionManager() *ConnectionManager {
+	cmInit.Do(func() {
+		cm = ConnectionManager{
+			connMap: sync.Map{},
+		}
+	})
+	return &cm
 }
 
 func (cm *ConnectionManager) Store(addr string, conn net.Conn) {

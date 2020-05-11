@@ -3,6 +3,7 @@ package gnet
 import (
 	"go_game/src/gevent"
 	"go_game/src/gnet/iface"
+	"go_game/src/guser"
 	"go_game/src/util"
 	"io"
 	"log"
@@ -12,7 +13,6 @@ import (
 )
 
 type Server struct {
-	cm         ConnectionManager  //管理客户端连接
 	network    string             //网络层协议
 	host       string             //服务端host
 	port       int32              //服务端端口
@@ -22,7 +22,6 @@ type Server struct {
 
 func CreateServer(network string, host string, port int32) iface.IServer {
 	server := &Server{
-		cm:         CreateManager(),
 		network:    network,
 		host:       host,
 		port:       port,
@@ -57,7 +56,8 @@ func (server *Server) GetShutdownChan() chan bool {
 }
 
 func (server *Server) Shutdown() {
-	server.cm.Shutdown()
+	guser.GetConnectionManager().Shutdown()
+	guser.GetUserManager().Shutdown()
 	log.Printf("=====  server destroy! host:{%s}, port:{%d}  =====\n", server.host, server.port)
 }
 
@@ -70,7 +70,7 @@ func (server *Server) accept(listen net.Listener) {
 			}
 			continue
 		}
-		server.cm.Store(conn.RemoteAddr().String(), conn)
+		guser.GetConnectionManager().Store(conn.RemoteAddr().String(), conn)
 		go server.selectConn(conn)
 	}
 }
@@ -82,7 +82,10 @@ func (server *Server) selectConn(conn net.Conn) {
 			if err != io.EOF {
 				log.Println(err)
 			}
-			server.cm.Delete(conn.RemoteAddr().String())
+			guser.GetConnectionManager().Delete(conn.RemoteAddr().String())
+			if user, exist := guser.GetUserManager().Conn2user[conn]; exist {
+				guser.GetUserManager().Lost(user.UserId)
+			}
 			return
 		}
 		length := util.Bytes2Int(head)
@@ -91,14 +94,35 @@ func (server *Server) selectConn(conn net.Conn) {
 			if err != io.EOF {
 				log.Println(err)
 			}
-			server.cm.Delete(conn.RemoteAddr().String())
+			guser.GetConnectionManager().Delete(conn.RemoteAddr().String())
+			if user, exist := guser.GetUserManager().Conn2user[conn]; exist {
+				guser.GetUserManager().Lost(user.UserId)
+			}
 			return
 		}
 		protocol := BuildProtocolFromBytes(length, buf)
-		//TODO 验证protocol
 		//TODO User->Connection管理
 		event := gevent.CreateEventFromBytes(protocol.msg)
+		if !server.validMsg(&protocol, &event) {
+			guser.GetConnectionManager().Delete(conn.RemoteAddr().String())
+			msgId := guser.GetUserManager().NextMsgId(event.GetUserId())
+			guser.GetUserManager().Lost(event.GetUserId())
+			log.Printf("msgId not match. current : %d, want : %d", protocol.msgId, msgId)
+			return
+		}
 		index := event.GetUserId() % int32(len(server.eventLoops))
-		server.eventLoops[index].Push(event)
+		loginEvent := gevent.LoginEvent{
+			Event: &event,
+			Conn:  conn,
+		}
+		server.eventLoops[index].Push(&loginEvent)
+		guser.GetUserManager().IncrNextMsgId(event.GetUserId())
 	}
+}
+
+func (server *Server) validMsg(protocol *Protocol, event *gevent.Event) bool {
+	if protocol.msgId <= 0 {
+		return true
+	}
+	return protocol.msgId == guser.GetUserManager().NextMsgId((*event).GetUserId())
 }
